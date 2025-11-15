@@ -52,6 +52,7 @@ const navigation = [
     href: "/competencias",
     icon: Trophy,
     children: [
+      { name: "Eventos", href: "/competencias/eventos" },
       { name: "Temporadas", href: "/competencias/temporadas" },
       { name: "Ligas y Clasificaciones", href: "/competencias/ligas" },
       { name: "Configuración", href: "/competencias/configuracion" },
@@ -78,16 +79,11 @@ const navigation = [
     ],
   },
   {
-    name: "Eventos",
-    href: "/notificaciones/eventos",
-    icon: Calendar,
-  },
-  {
     name: "Notificaciones",
     href: "/notificaciones",
     icon: Bell,
     children: [
-      { name: "Eventos", href: "/notificaciones/eventos" },
+      { name: "Campañas de Eventos", href: "/notificaciones/eventos" },
       { name: "Push", href: "/notificaciones/push" },
     ],
   },
@@ -132,6 +128,10 @@ export function AdminSidebar() {
 
   const toggleExpanded = (name: string) => {
     setExpandedItems((prev) => (prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]))
+  }
+
+  const handleLogout = () => {
+    window.location.href = "/"
   }
 
   return (
@@ -225,6 +225,29 @@ export function AdminSidebar() {
               ))}
             </nav>
           </ScrollArea>
+
+          <div className="px-3 py-4 border-t border-sidebar-border">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              onClick={handleLogout}
+            >
+              <svg
+                className="w-5 h-5 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              <span className="text-sm">Cerrar Sesión</span>
+            </Button>
+          </div>
         </div>
       </div>
 
