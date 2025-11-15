@@ -130,7 +130,16 @@ export function AdminSidebar() {
     setExpandedItems((prev) => (prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]))
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // Intentar cerrar sesión de Supabase si existe
+      const { createClient } = await import("@/lib/supabase/client")
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.log("No Supabase session to clear")
+    }
+    // Redirigir al login
     window.location.href = "/"
   }
 

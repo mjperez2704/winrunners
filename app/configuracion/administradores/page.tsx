@@ -15,65 +15,234 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Users, UserPlus, Shield, Crown, Settings, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { Users, UserPlus, Shield, Crown, Settings, Trash2 } from 'lucide-react'
+import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
 
-const administradores = [
-  {
-    id: 1,
-    nombre: "Admin Principal",
-    email: "admin@winrunners.com",
-    rol: "Super Admin",
-    estado: "Activo",
-    ultimoAcceso: "Hace 5 min",
-  },
-  {
-    id: 2,
-    nombre: "María González",
-    email: "maria.g@winrunners.com",
-    rol: "Admin",
-    estado: "Activo",
-    ultimoAcceso: "Hace 2 horas",
-  },
-  {
-    id: 3,
-    nombre: "Carlos Rodríguez",
-    email: "carlos.r@winrunners.com",
-    rol: "Moderador",
-    estado: "Activo",
-    ultimoAcceso: "Hace 1 día",
-  },
-  {
-    id: 4,
-    nombre: "Ana López",
-    email: "ana.l@winrunners.com",
-    rol: "Soporte",
-    estado: "Activo",
-    ultimoAcceso: "Hace 3 días",
-  },
-]
-
-const permisos = [
-  { modulo: "Usuarios", lectura: true, escritura: true, eliminacion: false },
-  { modulo: "Competencias", lectura: true, escritura: true, eliminacion: true },
-  { modulo: "Tracking", lectura: true, escritura: false, eliminacion: false },
-  { modulo: "Gamificación", lectura: true, escritura: true, eliminacion: false },
-  { modulo: "Suscripciones", lectura: true, escritura: true, eliminacion: false },
-  { modulo: "Patrocinadores", lectura: true, escritura: false, eliminacion: false },
-  { modulo: "Configuración", lectura: true, escritura: false, eliminacion: false },
-]
+interface AdminUser {
+  id: string
+  email: string
+  full_name: string
+  role: string
+  is_active: boolean
+  last_login_at: string | null
+  permissions: any
+  created_at: string
+}
 
 export default function AdministradoresPage() {
   const [isOpen, setIsOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [administradores, setAdministradores] = useState<AdminUser[]>([])
+  const [selectedAdmin, setSelectedAdmin] = useState<AdminUser | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [newAdmin, setNewAdmin] = useState({
+    full_name: "",
+    email: "",
+    role: "moderador"
+  })
   const { toast } = useToast()
+  const supabase = createClient()
 
-  const handleInvite = () => {
-    setIsOpen(false)
-    toast({
-      title: "Invitación enviada",
-      description: "Se ha enviado un email de invitación al nuevo administrador.",
-    })
+  useEffect(() => {
+    loadAdministradores()
+  }, [])
+
+  const loadAdministradores = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setAdministradores(data || [])
+    } catch (error) {
+      console.error('Error loading admins:', error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los administradores",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleInvite = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_users')
+        .insert([{
+          email: newAdmin.email,
+          full_name: newAdmin.full_name,
+          role: newAdmin.role,
+          is_active: true,
+          permissions: getDefaultPermissions(newAdmin.role)
+        }])
+        .select()
+
+      if (error) throw error
+
+      setIsOpen(false)
+      setNewAdmin({ full_name: "", email: "", role: "moderador" })
+      await loadAdministradores()
+      
+      toast({
+        title: "Administrador agregado",
+        description: "El nuevo administrador ha sido creado exitosamente.",
+      })
+    } catch (error) {
+      console.error('Error adding admin:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo agregar el administrador",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleEdit = async () => {
+    if (!selectedAdmin) return
+
+    try {
+      const { error } = await supabase
+        .from('admin_users')
+        .update({
+          full_name: selectedAdmin.full_name,
+          email: selectedAdmin.email,
+          role: selectedAdmin.role,
+          is_active: selectedAdmin.is_active
+        })
+        .eq('id', selectedAdmin.id)
+
+      if (error) throw error
+
+      setIsEditOpen(false)
+      setSelectedAdmin(null)
+      await loadAdministradores()
+      
+      toast({
+        title: "Administrador actualizado",
+        description: "Los cambios se guardaron exitosamente.",
+      })
+    } catch (error) {
+      console.error('Error updating admin:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el administrador",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Estás seguro de eliminar este administrador?')) return
+
+    try {
+      const { error } = await supabase
+        .from('admin_users')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadAdministradores()
+      
+      toast({
+        title: "Administrador eliminado",
+        description: "El administrador ha sido eliminado del sistema.",
+      })
+    } catch (error) {
+      console.error('Error deleting admin:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el administrador",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const getDefaultPermissions = (role: string) => {
+    switch (role) {
+      case 'super_admin':
+        return {
+          usuarios: { read: true, write: true, delete: true },
+          competencias: { read: true, write: true, delete: true },
+          tracking: { read: true, write: true, delete: true },
+          gamificacion: { read: true, write: true, delete: true },
+          suscripciones: { read: true, write: true, delete: true },
+          patrocinadores: { read: true, write: true, delete: true },
+          configuracion: { read: true, write: true, delete: true }
+        }
+      case 'admin':
+        return {
+          usuarios: { read: true, write: true, delete: false },
+          competencias: { read: true, write: true, delete: true },
+          tracking: { read: true, write: false, delete: false },
+          gamificacion: { read: true, write: true, delete: false },
+          suscripciones: { read: true, write: true, delete: false },
+          patrocinadores: { read: true, write: false, delete: false },
+          configuracion: { read: true, write: false, delete: false }
+        }
+      case 'moderador':
+        return {
+          usuarios: { read: true, write: true, delete: false },
+          competencias: { read: true, write: true, delete: false },
+          tracking: { read: true, write: false, delete: false },
+          gamificacion: { read: true, write: true, delete: false },
+          suscripciones: { read: false, write: false, delete: false },
+          patrocinadores: { read: true, write: false, delete: false },
+          configuracion: { read: false, write: false, delete: false }
+        }
+      default:
+        return {
+          usuarios: { read: true, write: false, delete: false },
+          competencias: { read: true, write: false, delete: false },
+          tracking: { read: true, write: false, delete: false },
+          gamificacion: { read: true, write: false, delete: false },
+          suscripciones: { read: true, write: false, delete: false },
+          patrocinadores: { read: true, write: false, delete: false },
+          configuracion: { read: false, write: false, delete: false }
+        }
+    }
+  }
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'super_admin': return 'Super Admin'
+      case 'admin': return 'Admin'
+      case 'moderador': return 'Moderador'
+      case 'soporte': return 'Soporte'
+      default: return role
+    }
+  }
+
+  const getTimeAgo = (date: string | null) => {
+    if (!date) return 'Nunca'
+    const now = new Date()
+    const loginDate = new Date(date)
+    const diffMs = now.getTime() - loginDate.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 60) return `Hace ${diffMins} min`
+    if (diffHours < 24) return `Hace ${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}`
+    return `Hace ${diffDays} ${diffDays === 1 ? 'día' : 'días'}`
+  }
+
+  const stats = {
+    total: administradores.length,
+    superAdmin: administradores.filter(a => a.role === 'super_admin').length,
+    admin: administradores.filter(a => a.role === 'admin').length,
+    moderador: administradores.filter(a => a.role === 'moderador').length
+  }
+
+  if (loading) {
+    return <div className="p-6">Cargando...</div>
   }
 
   return (
@@ -94,26 +263,40 @@ export default function AdministradoresPage() {
             <DialogHeader>
               <DialogTitle>Invitar Nuevo Administrador</DialogTitle>
               <DialogDescription>
-                Envía una invitación por email para agregar un nuevo administrador al sistema
+                Agrega un nuevo administrador al sistema
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Nombre Completo</Label>
-                <Input id="name" placeholder="Juan Pérez" />
+                <Input 
+                  id="name" 
+                  placeholder="Juan Pérez" 
+                  value={newAdmin.full_name}
+                  onChange={(e) => setNewAdmin({...newAdmin, full_name: e.target.value})}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="juan@winrunners.com" />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="juan@winrunners.com" 
+                  value={newAdmin.email}
+                  onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Rol</Label>
-                <Select defaultValue="moderador">
+                <Select 
+                  value={newAdmin.role} 
+                  onValueChange={(value) => setNewAdmin({...newAdmin, role: value})}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="super-admin">Super Admin</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="moderador">Moderador</SelectItem>
                     <SelectItem value="soporte">Soporte</SelectItem>
@@ -125,7 +308,7 @@ export default function AdministradoresPage() {
               <Button variant="outline" onClick={() => setIsOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleInvite}>Enviar Invitación</Button>
+              <Button onClick={handleInvite}>Agregar Administrador</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -138,7 +321,7 @@ export default function AdministradoresPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">4</div>
+            <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground">Activos en el sistema</p>
           </CardContent>
         </Card>
@@ -149,7 +332,7 @@ export default function AdministradoresPage() {
             <Crown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1</div>
+            <div className="text-2xl font-bold">{stats.superAdmin}</div>
             <p className="text-xs text-muted-foreground">Acceso total</p>
           </CardContent>
         </Card>
@@ -160,7 +343,7 @@ export default function AdministradoresPage() {
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1</div>
+            <div className="text-2xl font-bold">{stats.admin}</div>
             <p className="text-xs text-muted-foreground">Gestión completa</p>
           </CardContent>
         </Card>
@@ -171,7 +354,7 @@ export default function AdministradoresPage() {
             <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2</div>
+            <div className="text-2xl font-bold">{stats.moderador}</div>
             <p className="text-xs text-muted-foreground">Acceso limitado</p>
           </CardContent>
         </Card>
@@ -189,10 +372,10 @@ export default function AdministradoresPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-semibold">
-                      {admin.nombre.charAt(0)}
+                      {admin.full_name.charAt(0)}
                     </div>
                     <div>
-                      <p className="font-medium">{admin.nombre}</p>
+                      <p className="font-medium">{admin.full_name}</p>
                       <p className="text-sm text-muted-foreground">{admin.email}</p>
                     </div>
                   </div>
@@ -202,28 +385,39 @@ export default function AdministradoresPage() {
                     <Badge
                       variant="outline"
                       className={
-                        admin.rol === "Super Admin"
+                        admin.role === "super_admin"
                           ? "border-purple-500 text-purple-500"
-                          : admin.rol === "Admin"
+                          : admin.role === "admin"
                             ? "border-blue-500 text-blue-500"
-                            : admin.rol === "Moderador"
+                            : admin.role === "moderador"
                               ? "border-green-500 text-green-500"
                               : "border-yellow-500 text-yellow-500"
                       }
                     >
-                      {admin.rol === "Super Admin" && <Crown className="mr-1 h-3 w-3" />}
-                      {admin.rol === "Admin" && <Shield className="mr-1 h-3 w-3" />}
-                      {admin.rol === "Moderador" && <Settings className="mr-1 h-3 w-3" />}
-                      {admin.rol}
+                      {admin.role === "super_admin" && <Crown className="mr-1 h-3 w-3" />}
+                      {admin.role === "admin" && <Shield className="mr-1 h-3 w-3" />}
+                      {admin.role === "moderador" && <Settings className="mr-1 h-3 w-3" />}
+                      {getRoleLabel(admin.role)}
                     </Badge>
-                    <p className="text-xs text-muted-foreground mt-1">{admin.ultimoAcceso}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{getTimeAgo(admin.last_login_at)}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedAdmin(admin)
+                        setIsEditOpen(true)
+                      }}
+                    >
                       Editar
                     </Button>
-                    {admin.id !== 1 && (
-                      <Button variant="ghost" size="sm">
+                    {admin.role !== 'super_admin' && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDelete(admin.id)}
+                      >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     )}
@@ -235,88 +429,61 @@ export default function AdministradoresPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Roles y Permisos</CardTitle>
-          <CardDescription>Define los permisos de cada rol de administrador</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Seleccionar Rol</Label>
-              <Select defaultValue="admin">
-                <SelectTrigger className="w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="super-admin">Super Admin</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="moderador">Moderador</SelectItem>
-                  <SelectItem value="soporte">Soporte</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left p-4">Módulo</th>
-                    <th className="text-center p-4">Lectura</th>
-                    <th className="text-center p-4">Escritura</th>
-                    <th className="text-center p-4">Eliminación</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {permisos.map((permiso) => (
-                    <tr key={permiso.modulo} className="border-t">
-                      <td className="p-4 font-medium">{permiso.modulo}</td>
-                      <td className="text-center p-4">
-                        <input type="checkbox" defaultChecked={permiso.lectura} className="w-4 h-4" />
-                      </td>
-                      <td className="text-center p-4">
-                        <input type="checkbox" defaultChecked={permiso.escritura} className="w-4 h-4" />
-                      </td>
-                      <td className="text-center p-4">
-                        <input type="checkbox" defaultChecked={permiso.eliminacion} className="w-4 h-4" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end">
-              <Button>Guardar Permisos</Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Actividad Reciente</CardTitle>
-          <CardDescription>Últimas acciones de los administradores</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[
-              { admin: "Admin Principal", accion: "Modificó configuración general", tiempo: "Hace 5 min" },
-              { admin: "María González", accion: "Suspendió usuario #4521", tiempo: "Hace 1 hora" },
-              { admin: "Carlos Rodríguez", accion: "Creó nueva competencia", tiempo: "Hace 3 horas" },
-              { admin: "Ana López", accion: "Respondió ticket de soporte", tiempo: "Hace 5 horas" },
-            ].map((actividad, i) => (
-              <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">{actividad.admin}</p>
-                  <p className="text-sm text-muted-foreground">{actividad.accion}</p>
-                </div>
-                <span className="text-sm text-muted-foreground">{actividad.tiempo}</span>
+      {/* Dialog de Editar */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Administrador</DialogTitle>
+            <DialogDescription>
+              Modifica los datos del administrador
+            </DialogDescription>
+          </DialogHeader>
+          {selectedAdmin && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Nombre Completo</Label>
+                <Input 
+                  id="edit-name" 
+                  value={selectedAdmin.full_name}
+                  onChange={(e) => setSelectedAdmin({...selectedAdmin, full_name: e.target.value})}
+                />
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input 
+                  id="edit-email" 
+                  type="email" 
+                  value={selectedAdmin.email}
+                  onChange={(e) => setSelectedAdmin({...selectedAdmin, email: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Rol</Label>
+                <Select 
+                  value={selectedAdmin.role} 
+                  onValueChange={(value) => setSelectedAdmin({...selectedAdmin, role: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="moderador">Moderador</SelectItem>
+                    <SelectItem value="soporte">Soporte</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEdit}>Guardar Cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
