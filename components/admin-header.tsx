@@ -14,27 +14,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from 'next/navigation'
-import { createClient } from "@/lib/supabase/client"
-import { useToast } from "@/hooks/use-toast"
 
 export function AdminHeader() {
   const router = useRouter()
-  const { toast } = useToast()
 
-  const handleLogout = async () => {
-    const supabase = createClient()
-    const { error } = await supabase.auth.signOut()
-
-    if (error) {
-      toast({
-        title: 'Error',
-        description: 'No se pudo cerrar sesión',
-        variant: 'destructive',
-      })
-    } else {
-      router.push('/')
-      router.refresh()
-    }
+  const handleLogout = () => {
+    router.push('/')
+    router.refresh()
   }
 
   return (

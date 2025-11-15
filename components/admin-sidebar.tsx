@@ -84,23 +84,44 @@ const navigation = [
   },
   {
     name: "Notificaciones",
-    href: "/notificaciones/push",
+    href: "/notificaciones",
     icon: Bell,
+    children: [
+      { name: "Eventos", href: "/notificaciones/eventos" },
+      { name: "Push", href: "/notificaciones/push" },
+    ],
   },
   {
     name: "Análisis",
     href: "/analisis",
     icon: Target,
+    children: [
+      { name: "Reportes", href: "/analisis/reportes" },
+      { name: "Tss", href: "/analisis/tss" },
+      { name: "Vo2max", href: "/analisis/vo2max" },
+      { name: "Zonas", href: "/analisis/zonas" },
+    ],
   },
   {
     name: "Integraciones",
     href: "/integraciones",
     icon: Zap,
+    children: [
+      { name: "Apple-Health", href: "/integraciones/apple-health" },
+      { name: "Google-Fit", href: "/integraciones/google-fit" },
+      { name: "Strava", href: "/integraciones/strava" },
+      { name: "Validaciones", href: "/integraciones/validaciones" },
+    ],
   },
   {
     name: "Configuración",
     href: "/configuracion",
     icon: Settings,
+    children: [
+      { name: "Administradores", href: "/configuracion/administradores" },
+      { name: "General", href: "/configuracion/general" },
+      { name: "Sistema", href: "/configuracion/sistema" },
+    ],
   },
 ]
 
