@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { updateSession } from './lib/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
+  // Simplemente permitir todas las peticiones sin verificar autenticación
+  return NextResponse.next()
 }
 
 export const config = {

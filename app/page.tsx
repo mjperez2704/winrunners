@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,20 +22,17 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const supabase = createClient()
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      router.push('/dashboard')
-      router.refresh()
-    }
+    setTimeout(() => {
+      if (email && password) {
+        // Guardar una bandera simple en localStorage para simular sesión
+        localStorage.setItem('isAuthenticated', 'true')
+        localStorage.setItem('userEmail', email)
+        router.push('/dashboard')
+      } else {
+        setError('Por favor ingresa email y contraseña')
+        setLoading(false)
+      }
+    }, 500)
   }
 
   return (
