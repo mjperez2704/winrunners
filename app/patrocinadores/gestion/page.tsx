@@ -1,68 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building2, Search, Plus, Edit, Trash2, Eye, TrendingUp, DollarSign } from "lucide-react"
-
-const sponsors = [
-  {
-    id: 1,
-    name: "Nike Running",
-    logo: "/nike-logo.jpg",
-    tier: "PLATINUM",
-    status: "active",
-    investment: "€50,000",
-    campaigns: 5,
-    participants: 12847,
-    roi: "+245%",
-    startDate: "2024-01-15",
-    endDate: "2024-12-31",
-  },
-  {
-    id: 2,
-    name: "Gatorade",
-    logo: "/gatorade-logo.jpg",
-    tier: "GOLD",
-    status: "active",
-    investment: "€30,000",
-    campaigns: 3,
-    participants: 8432,
-    roi: "+187%",
-    startDate: "2024-02-01",
-    endDate: "2024-11-30",
-  },
-  {
-    id: 3,
-    name: "Adidas",
-    logo: "/adidas-logo.jpg",
-    tier: "PLATINUM",
-    status: "active",
-    investment: "€45,000",
-    campaigns: 4,
-    participants: 10234,
-    roi: "+203%",
-    startDate: "2024-01-20",
-    endDate: "2024-12-31",
-  },
-  {
-    id: 4,
-    name: "PowerBar",
-    logo: "/powerbar-logo.jpg",
-    tier: "SILVER",
-    status: "pending",
-    investment: "€15,000",
-    campaigns: 1,
-    participants: 3421,
-    roi: "+125%",
-    startDate: "2024-05-01",
-    endDate: "2024-10-31",
-  },
-]
+import { Building2, Search, Plus, Edit, Trash2, Eye, TrendingUp, DollarSign } from 'lucide-react'
 
 const tierColors = {
   PLATINUM: "bg-purple-500/10 text-purple-400 border-purple-500/30",
@@ -77,9 +23,56 @@ const statusColors = {
 }
 
 export default function GestionPatrocinadoresPage() {
+  const [sponsors, setSponsors] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterTier, setFilterTier] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
+
+  useEffect(() => {
+    async function loadSponsors() {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('sponsors')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+        
+        if (error) throw error
+        
+        const mappedData = data?.map(sponsor => ({
+          id: sponsor.id,
+          name: sponsor.name,
+          logo: sponsor.logo_url || '/placeholder.svg',
+          tier: sponsor.tier || 'SILVER',
+          status: sponsor.is_active ? 'active' : 'inactive',
+          investment: `€${(sponsor.total_investment_eur || 0).toLocaleString()}`,
+          campaigns: Math.floor(Math.random() * 5) + 1, // Temporal
+          participants: Math.floor(Math.random() * 15000), // Temporal
+          roi: `+${Math.floor(Math.random() * 200) + 100}%`, // Temporal
+          startDate: sponsor.contract_start?.split('T')[0] || '',
+          endDate: sponsor.contract_end?.split('T')[0] || ''
+        })) || []
+        
+        setSponsors(mappedData)
+      } catch (error) {
+        console.error('Error loading sponsors:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadSponsors()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-muted-foreground">Cargando patrocinadores...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -95,8 +88,8 @@ export default function GestionPatrocinadoresPage() {
             <Building2 className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">12</div>
-            <p className="text-xs text-green-400 mt-1">+3 este mes</p>
+            <div className="text-2xl font-bold text-foreground">{sponsors.length}</div>
+            <p className="text-xs text-green-400 mt-1">Desde base de datos</p>
           </CardContent>
         </Card>
 
@@ -106,8 +99,8 @@ export default function GestionPatrocinadoresPage() {
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">€485K</div>
-            <p className="text-xs text-green-400 mt-1">+18.2% vs mes anterior</p>
+            <div className="text-2xl font-bold text-foreground">€0</div>
+            <p className="text-xs text-green-400 mt-1">0.00% vs mes anterior</p>
           </CardContent>
         </Card>
 
@@ -117,8 +110,8 @@ export default function GestionPatrocinadoresPage() {
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">23</div>
-            <p className="text-xs text-muted-foreground mt-1">En 8 patrocinadores</p>
+            <div className="text-2xl font-bold text-foreground">0</div>
+            <p className="text-xs text-muted-foreground mt-1">En 0 patrocinadores</p>
           </CardContent>
         </Card>
 
@@ -128,7 +121,7 @@ export default function GestionPatrocinadoresPage() {
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">+192%</div>
+            <div className="text-2xl font-bold text-foreground">+0%</div>
             <p className="text-xs text-green-400 mt-1">Excelente desempeño</p>
           </CardContent>
         </Card>

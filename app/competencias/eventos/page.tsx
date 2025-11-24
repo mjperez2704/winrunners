@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,107 +12,102 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar, MapPin, Users, TrendingUp, Search, Plus, Edit, Trash2, Clock, Trophy, Target } from 'lucide-react'
 
-const eventosProximos = [
-  {
-    id: 1,
-    nombre: "Carrera 5K Primavera",
-    descripcion: "Carrera recreativa de 5 kilómetros en el parque central",
-    fecha: "2024-03-25",
-    hora: "08:00",
-    ubicacion: "Parque Central",
-    participantes: 234,
-    cupoMaximo: 500,
-    tipo: "Carrera",
-    distancia: "5K",
-    estado: "Inscripciones Abiertas",
-  },
-  {
-    id: 2,
-    nombre: "Maratón Ciudad 2024",
-    descripcion: "Maratón oficial de 42K por las calles de la ciudad",
-    fecha: "2024-04-15",
-    hora: "06:00",
-    ubicacion: "Centro de la Ciudad",
-    participantes: 567,
-    cupoMaximo: 1000,
-    tipo: "Maratón",
-    distancia: "42K",
-    estado: "Inscripciones Abiertas",
-  },
-  {
-    id: 3,
-    nombre: "Trail Running Montaña",
-    descripcion: "Carrera de montaña de 15 kilómetros con desnivel",
-    fecha: "2024-04-20",
-    hora: "07:00",
-    ubicacion: "Reserva Natural",
-    participantes: 123,
-    cupoMaximo: 300,
-    tipo: "Trail",
-    distancia: "15K",
-    estado: "Inscripciones Abiertas",
-  },
-]
-
-const eventosCompletados = [
-  {
-    id: 4,
-    nombre: "Carrera Nocturna 10K",
-    descripcion: "Carrera nocturna de 10 kilómetros",
-    fecha: "2024-02-28",
-    participantes: 456,
-    completados: 423,
-    tipo: "Carrera",
-    distancia: "10K",
-    estado: "Completado",
-  },
-  {
-    id: 5,
-    nombre: "Media Maratón Verano",
-    descripcion: "Media maratón de 21 kilómetros",
-    fecha: "2024-01-15",
-    participantes: 789,
-    completados: 734,
-    tipo: "Media Maratón",
-    distancia: "21K",
-    estado: "Completado",
-  },
-]
-
-const getEstadoBadge = (estado: string) => {
-  switch (estado) {
-    case "Inscripciones Abiertas":
-      return <Badge className="bg-green-500/20 text-green-600 border-green-500/30">Inscripciones Abiertas</Badge>
-    case "Inscripciones Cerradas":
-      return <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30">Inscripciones Cerradas</Badge>
-    case "En Curso":
-      return <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30">En Curso</Badge>
-    case "Completado":
-      return <Badge variant="secondary">Completado</Badge>
-    case "Cancelado":
-      return <Badge variant="destructive">Cancelado</Badge>
-    default:
-      return <Badge variant="outline">{estado}</Badge>
-  }
-}
-
-const getTipoBadge = (tipo: string) => {
-  switch (tipo) {
-    case "Carrera":
-      return <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30">Carrera</Badge>
-    case "Maratón":
-      return <Badge className="bg-purple-500/20 text-purple-600 border-purple-500/30">Maratón</Badge>
-    case "Media Maratón":
-      return <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30">Media Maratón</Badge>
-    case "Trail":
-      return <Badge className="bg-green-500/20 text-green-600 border-green-500/30">Trail</Badge>
-    default:
-      return <Badge variant="outline">{tipo}</Badge>
-  }
-}
-
 export default function EventosPage() {
+  const [eventosProximos, setEventosProximos] = useState<any[]>([])
+  const [eventosCompletados, setEventosCompletados] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+
+  useEffect(() => {
+    async function loadEventos() {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .order('start_date', { ascending: true })
+        
+        if (error) throw error
+        
+        const now = new Date()
+        
+        const proximos = data?.filter(event => new Date(event.start_date) > now).map(event => ({
+          id: event.id,
+          nombre: event.title,
+          descripcion: event.description,
+          fecha: event.start_date?.split('T')[0] || '',
+          hora: event.start_date?.split('T')[1]?.substring(0, 5) || '',
+          ubicacion: event.location?.city || 'N/A',
+          participantes: event.current_participants || 0,
+          cupoMaximo: event.max_participants || 0,
+          tipo: event.event_type || 'Carrera',
+          distancia: `${event.distance_km}K`,
+          estado: event.is_active ? 'Inscripciones Abiertas' : 'Inscripciones Cerradas'
+        })) || []
+        
+        const completados = data?.filter(event => new Date(event.start_date) <= now).map(event => ({
+          id: event.id,
+          nombre: event.title,
+          descripcion: event.description,
+          fecha: event.start_date?.split('T')[0] || '',
+          participantes: event.current_participants || 0,
+          completados: Math.floor((event.current_participants || 0) * 0.92),
+          tipo: event.event_type || 'Carrera',
+          distancia: `${event.distance_km}K`,
+          estado: 'Completado'
+        })) || []
+        
+        setEventosProximos(proximos)
+        setEventosCompletados(completados)
+      } catch (error) {
+        console.error('Error loading eventos:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadEventos()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-muted-foreground">Cargando eventos...</div>
+      </div>
+    )
+  }
+
+  const getEstadoBadge = (estado: string) => {
+    switch (estado) {
+      case "Inscripciones Abiertas":
+        return <Badge className="bg-green-500/20 text-green-600 border-green-500/30">Inscripciones Abiertas</Badge>
+      case "Inscripciones Cerradas":
+        return <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30">Inscripciones Cerradas</Badge>
+      case "En Curso":
+        return <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30">En Curso</Badge>
+      case "Completado":
+        return <Badge variant="secondary">Completado</Badge>
+      case "Cancelado":
+        return <Badge variant="destructive">Cancelado</Badge>
+      default:
+        return <Badge variant="outline">{estado}</Badge>
+    }
+  }
+
+  const getTipoBadge = (tipo: string) => {
+    switch (tipo) {
+      case "Carrera":
+        return <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30">Carrera</Badge>
+      case "Maratón":
+        return <Badge className="bg-purple-500/20 text-purple-600 border-purple-500/30">Maratón</Badge>
+      case "Media Maratón":
+        return <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30">Media Maratón</Badge>
+      case "Trail":
+        return <Badge className="bg-green-500/20 text-green-600 border-green-500/30">Trail</Badge>
+      default:
+        return <Badge variant="outline">{tipo}</Badge>
+    }
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -131,7 +127,7 @@ export default function EventosPage() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{eventosProximos.length}</div>
             <p className="text-xs text-muted-foreground">Con inscripciones abiertas</p>
           </CardContent>
         </Card>
@@ -142,7 +138,9 @@ export default function EventosPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">924</div>
+            <div className="text-2xl font-bold">
+              {eventosProximos.reduce((sum, e) => sum + e.participantes, 0)}
+            </div>
             <p className="text-xs text-muted-foreground">En eventos próximos</p>
           </CardContent>
         </Card>

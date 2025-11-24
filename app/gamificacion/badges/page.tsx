@@ -1,97 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Award,
-  Trophy,
-  Star,
-  Zap,
-  Target,
-  Crown,
-  Medal,
-  Flame,
-  TrendingUp,
-  Users,
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-} from "lucide-react"
-
-const badges = [
-  {
-    id: 1,
-    nombre: "Primera Carrera",
-    descripcion: "Completa tu primera carrera",
-    icono: "Trophy",
-    rareza: "Común",
-    puntos: 50,
-    desbloqueados: 1847,
-    categoria: "Inicio",
-    color: "blue",
-  },
-  {
-    id: 2,
-    nombre: "Maratonista",
-    descripcion: "Completa 100 carreras",
-    icono: "Medal",
-    rareza: "Épico",
-    puntos: 500,
-    desbloqueados: 234,
-    categoria: "Carreras",
-    color: "purple",
-  },
-  {
-    id: 3,
-    nombre: "Velocista",
-    descripcion: "Corre 5K en menos de 20 minutos",
-    icono: "Zap",
-    rareza: "Raro",
-    puntos: 200,
-    desbloqueados: 567,
-    categoria: "Rendimiento",
-    color: "yellow",
-  },
-  {
-    id: 4,
-    nombre: "Racha de Fuego",
-    descripcion: "Mantén una racha de 30 días",
-    icono: "Flame",
-    rareza: "Legendario",
-    puntos: 1000,
-    desbloqueados: 89,
-    categoria: "Consistencia",
-    color: "orange",
-  },
-  {
-    id: 5,
-    nombre: "Explorador",
-    descripcion: "Corre en 10 ubicaciones diferentes",
-    icono: "Target",
-    rareza: "Raro",
-    puntos: 300,
-    desbloqueados: 445,
-    categoria: "Exploración",
-    color: "green",
-  },
-  {
-    id: 6,
-    nombre: "Campeón",
-    descripcion: "Gana una temporada",
-    icono: "Crown",
-    rareza: "Legendario",
-    puntos: 2000,
-    desbloqueados: 12,
-    categoria: "Competencia",
-    color: "gold",
-  },
-]
+import { Award, Trophy, Star, Zap, Target, Crown, Medal, Flame, TrendingUp, Users, Search, Plus, Edit, Trash2 } from 'lucide-react'
 
 const logros = [
   {
@@ -162,9 +79,48 @@ const getIconComponent = (iconName: string) => {
 }
 
 export default function BadgesPage() {
+  const [badges, setBadges] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategoria, setSelectedCategoria] = useState("todas")
   const [selectedRareza, setSelectedRareza] = useState("todas")
+
+  useEffect(() => {
+    async function loadBadges() {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('badges')
+          .select('*')
+          .eq('is_active', true)
+          .order('points', { ascending: false })
+        
+        if (error) throw error
+        
+        const mappedData = data?.map(badge => ({
+          id: badge.id,
+          nombre: badge.name,
+          descripcion: badge.description,
+          icono: badge.icon_url || 'Trophy',
+          rareza: badge.rarity || 'Común',
+          puntos: badge.points || 0,
+          desbloqueados: Math.floor(Math.random() * 2000), // Temporal hasta tener tabla user_badges
+          categoria: badge.criteria?.category || 'General',
+          color: badge.rarity === 'Legendario' ? 'gold' : 
+                 badge.rarity === 'Épico' ? 'purple' : 
+                 badge.rarity === 'Raro' ? 'blue' : 'gray'
+        })) || []
+        
+        setBadges(mappedData)
+      } catch (error) {
+        console.error('Error loading badges:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadBadges()
+  }, [])
 
   const filteredBadges = badges.filter(
     (badge) =>
@@ -172,6 +128,14 @@ export default function BadgesPage() {
       (selectedCategoria === "todas" || badge.categoria === selectedCategoria) &&
       (selectedRareza === "todas" || badge.rareza === selectedRareza),
   )
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-muted-foreground">Cargando badges...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -191,7 +155,7 @@ export default function BadgesPage() {
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">48</div>
+            <div className="text-2xl font-bold">{badges.length}</div>
             <p className="text-xs text-muted-foreground">Badges disponibles</p>
           </CardContent>
         </Card>

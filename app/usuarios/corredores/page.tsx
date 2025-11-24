@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,119 +25,51 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, MoreHorizontal, UserPlus, Mail, Phone, MapPin, Calendar, Activity } from "lucide-react"
-
-// Datos de ejemplo
-const corredores = [
-  {
-    id: 1,
-    nombre: "María González",
-    email: "maria.gonzalez@email.com",
-    telefono: "+34 666 123 456",
-    ciudad: "Madrid",
-    fechaRegistro: "2024-01-15",
-    estado: "activo",
-    nivel: "avanzado",
-    totalKm: 1247,
-    carreras: 45,
-    avatar: "/runner-woman.png",
-  },
-  {
-    id: 2,
-    nombre: "Juan Pérez",
-    email: "juan.perez@email.com",
-    telefono: "+34 677 234 567",
-    ciudad: "Barcelona",
-    fechaRegistro: "2024-02-03",
-    estado: "activo",
-    nivel: "intermedio",
-    totalKm: 892,
-    carreras: 32,
-    avatar: "/runner-man.png",
-  },
-  {
-    id: 3,
-    nombre: "Ana Martín",
-    email: "ana.martin@email.com",
-    telefono: "+34 688 345 678",
-    ciudad: "Valencia",
-    fechaRegistro: "2024-01-28",
-    estado: "suspendido",
-    nivel: "principiante",
-    totalKm: 234,
-    carreras: 8,
-    avatar: "/runner-woman-young.jpg",
-  },
-  {
-    id: 4,
-    nombre: "Carlos Ruiz",
-    email: "carlos.ruiz@email.com",
-    telefono: "+34 699 456 789",
-    ciudad: "Sevilla",
-    fechaRegistro: "2023-12-10",
-    estado: "activo",
-    nivel: "avanzado",
-    totalKm: 2156,
-    carreras: 78,
-    avatar: "/runner-man-athletic.jpg",
-  },
-  {
-    id: 5,
-    nombre: "Laura Sánchez",
-    email: "laura.sanchez@email.com",
-    telefono: "+34 611 567 890",
-    ciudad: "Bilbao",
-    fechaRegistro: "2024-03-05",
-    estado: "inactivo",
-    nivel: "intermedio",
-    totalKm: 567,
-    carreras: 19,
-    avatar: "/runner-woman-professional.jpg",
-  },
-]
-
-const getEstadoBadge = (estado: string) => {
-  switch (estado) {
-    case "activo":
-      return <Badge className="bg-accent/20 text-accent border-accent/30">Activo</Badge>
-    case "inactivo":
-      return <Badge variant="secondary">Inactivo</Badge>
-    case "suspendido":
-      return <Badge variant="destructive">Suspendido</Badge>
-    default:
-      return <Badge variant="outline">{estado}</Badge>
-  }
-}
-
-const getNivelBadge = (nivel: string) => {
-  switch (nivel) {
-    case "principiante":
-      return (
-        <Badge variant="outline" className="text-chart-3 border-chart-3/30">
-          Principiante
-        </Badge>
-      )
-    case "intermedio":
-      return (
-        <Badge variant="outline" className="text-primary border-primary/30">
-          Intermedio
-        </Badge>
-      )
-    case "avanzado":
-      return (
-        <Badge variant="outline" className="text-chart-4 border-chart-4/30">
-          Avanzado
-        </Badge>
-      )
-    default:
-      return <Badge variant="outline">{nivel}</Badge>
-  }
-}
+import { Search, MoreHorizontal, UserPlus, Mail, Phone, MapPin, Calendar, Activity } from 'lucide-react'
+import { createClient } from "@/lib/supabase/client"
 
 export default function CorredoresPage() {
+  const [corredores, setCorredores] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedEstado, setSelectedEstado] = useState("todos")
   const [selectedNivel, setSelectedNivel] = useState("todos")
+
+  useEffect(() => {
+    async function loadCorredores() {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false })
+        
+        if (error) throw error
+        
+        const mappedData = data?.map(profile => ({
+          id: profile.id,
+          nombre: profile.full_name || profile.display_name || 'Usuario',
+          email: profile.email || 'N/A',
+          telefono: '+34 XXX XXX XXX',
+          ciudad: profile.city || 'N/A',
+          fechaRegistro: profile.created_at?.split('T')[0] || '',
+          estado: profile.is_suspended ? 'suspendido' : 'activo',
+          nivel: profile.experience_level || 'principiante',
+          totalKm: profile.total_km_run || 0,
+          carreras: profile.total_runs || 0,
+          avatar: profile.avatar_url || '/placeholder.svg'
+        })) || []
+        
+        setCorredores(mappedData)
+      } catch (error) {
+        console.error('Error loading corredores:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadCorredores()
+  }, [])
 
   const filteredCorredores = corredores.filter((corredor) => {
     const matchesSearch =
@@ -149,6 +81,52 @@ export default function CorredoresPage() {
 
     return matchesSearch && matchesEstado && matchesNivel
   })
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-muted-foreground">Cargando corredores...</div>
+      </div>
+    )
+  }
+
+  const getEstadoBadge = (estado: string) => {
+    switch (estado) {
+      case "activo":
+        return <Badge className="bg-accent/20 text-accent border-accent/30">Activo</Badge>
+      case "inactivo":
+        return <Badge variant="secondary">Inactivo</Badge>
+      case "suspendido":
+        return <Badge variant="destructive">Suspendido</Badge>
+      default:
+        return <Badge variant="outline">{estado}</Badge>
+    }
+  }
+
+  const getNivelBadge = (nivel: string) => {
+    switch (nivel) {
+      case "principiante":
+        return (
+          <Badge variant="outline" className="text-chart-3 border-chart-3/30">
+            Principiante
+          </Badge>
+        )
+      case "intermedio":
+        return (
+          <Badge variant="outline" className="text-primary border-primary/30">
+            Intermedio
+          </Badge>
+        )
+      case "avanzado":
+        return (
+          <Badge variant="outline" className="text-chart-4 border-chart-4/30">
+            Avanzado
+          </Badge>
+        )
+      default:
+        return <Badge variant="outline">{nivel}</Badge>
+    }
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -229,9 +207,9 @@ export default function CorredoresPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12,847</div>
+            <div className="text-2xl font-bold">{corredores.length}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-accent">+247</span> este mes
+              <span className="text-accent">Desde base de datos</span>
             </p>
           </CardContent>
         </Card>
@@ -242,8 +220,12 @@ export default function CorredoresPage() {
             <div className="w-2 h-2 bg-accent rounded-full" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">11,234</div>
-            <p className="text-xs text-muted-foreground">87.4% del total</p>
+            <div className="text-2xl font-bold">
+              {corredores.filter(c => c.estado === 'activo').length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {((corredores.filter(c => c.estado === 'activo').length / corredores.length) * 100).toFixed(1)}% del total
+            </p>
           </CardContent>
         </Card>
 
